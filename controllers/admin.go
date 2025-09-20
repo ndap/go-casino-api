@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// AdminMiddleware middleware untuk memastikan user adalah admin
 func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userRole := c.GetString("user_role")
@@ -25,7 +24,6 @@ func AdminMiddleware() gin.HandlerFunc {
 	}
 }
 
-// GetAllUsers returns all users with pagination
 func GetAllUsers(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
@@ -39,20 +37,15 @@ func GetAllUsers(c *gin.Context) {
 
 	query := config.DB.Model(&models.User{})
 
-	// Apply search filter
 	if search != "" {
 		query = query.Where("username LIKE ? OR email LIKE ?", "%"+search+"%", "%"+search+"%")
 	}
 
-	// Apply status filter
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
 
-	// Get total count
 	query.Count(&total)
-
-	// Get users with pagination
 	if err := query.Preload("Wallet").Offset(offset).Limit(limit).Find(&users).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, AuthResponse{
 			Success: false,
@@ -61,7 +54,6 @@ func GetAllUsers(c *gin.Context) {
 		return
 	}
 
-	// Format response data
 	var userData []gin.H
 	for _, user := range users {
 		userData = append(userData, gin.H{
@@ -94,7 +86,6 @@ func GetAllUsers(c *gin.Context) {
 	})
 }
 
-// GetUserByID returns specific user by ID
 func GetUserByID(c *gin.Context) {
 	userID := c.Param("id")
 
@@ -128,12 +119,10 @@ func GetUserByID(c *gin.Context) {
 	})
 }
 
-// BanUserRequest structure for banning user
 type BanUserRequest struct {
 	Reason string `json:"reason" binding:"required"`
 }
 
-// BanUser bans a user account
 func BanUser(c *gin.Context) {
 	userID := c.Param("id")
 
@@ -155,7 +144,6 @@ func BanUser(c *gin.Context) {
 		return
 	}
 
-	// Check if user is already banned
 	if user.Status == "banned" {
 		c.JSON(http.StatusBadRequest, AuthResponse{
 			Success: false,
@@ -164,7 +152,6 @@ func BanUser(c *gin.Context) {
 		return
 	}
 
-	// Check if trying to ban admin
 	if user.Role == "admin" {
 		c.JSON(http.StatusForbidden, AuthResponse{
 			Success: false,
@@ -197,7 +184,6 @@ func BanUser(c *gin.Context) {
 	})
 }
 
-// UnbanUser unbans a user account
 func UnbanUser(c *gin.Context) {
 	userID := c.Param("id")
 
@@ -210,7 +196,6 @@ func UnbanUser(c *gin.Context) {
 		return
 	}
 
-	// Check if user is not banned
 	if user.Status != "banned" {
 		c.JSON(http.StatusBadRequest, AuthResponse{
 			Success: false,
@@ -242,14 +227,12 @@ func UnbanUser(c *gin.Context) {
 	})
 }
 
-// TopUpWalletRequest structure for topping up wallet
 type TopUpWalletRequest struct {
 	Amount   float64 `json:"amount" binding:"required,gt=0"`
 	Currency string  `json:"currency" binding:"required"`
 	Note     string  `json:"note"`
 }
 
-// TopUpWallet adds money to user's wallet
 func TopUpWallet(c *gin.Context) {
 	userID := c.Param("id")
 
@@ -271,7 +254,6 @@ func TopUpWallet(c *gin.Context) {
 		return
 	}
 
-	// Check if user is banned
 	if user.Status == "banned" {
 		c.JSON(http.StatusForbidden, AuthResponse{
 			Success: false,
@@ -280,10 +262,7 @@ func TopUpWallet(c *gin.Context) {
 		return
 	}
 
-	// Use transaction for wallet update
 	tx := config.DB.Begin()
-
-	// Update wallet balance
 	oldBalance := user.Wallet.Balance
 	user.Wallet.Balance += req.Amount
 
@@ -318,14 +297,12 @@ func TopUpWallet(c *gin.Context) {
 	})
 }
 
-// DeductWalletRequest structure for deducting from wallet
 type DeductWalletRequest struct {
 	Amount   float64 `json:"amount" binding:"required,gt=0"`
 	Currency string  `json:"currency" binding:"required"`
 	Note     string  `json:"note"`
 }
 
-// DeductWallet deducts money from user's wallet
 func DeductWallet(c *gin.Context) {
 	userID := c.Param("id")
 
@@ -347,7 +324,6 @@ func DeductWallet(c *gin.Context) {
 		return
 	}
 
-	// Check if user is banned
 	if user.Status == "banned" {
 		c.JSON(http.StatusForbidden, AuthResponse{
 			Success: false,
@@ -356,7 +332,6 @@ func DeductWallet(c *gin.Context) {
 		return
 	}
 
-	// Check if user has sufficient balance
 	if user.Wallet.Balance < req.Amount {
 		c.JSON(http.StatusBadRequest, AuthResponse{
 			Success: false,
@@ -365,10 +340,7 @@ func DeductWallet(c *gin.Context) {
 		return
 	}
 
-	// Use transaction for wallet update
 	tx := config.DB.Begin()
-
-	// Update wallet balance
 	oldBalance := user.Wallet.Balance
 	user.Wallet.Balance -= req.Amount
 
@@ -403,14 +375,12 @@ func DeductWallet(c *gin.Context) {
 	})
 }
 
-// GetWalletHistory returns wallet transaction history for admin
 func GetWalletHistory(c *gin.Context) {
 	userID := c.Param("id")
 
-	// Get pagination parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	transactionType := c.Query("type") // Filter by transaction type
+	transactionType := c.Query("type")
 
 	offset := (page - 1) * limit
 
@@ -428,15 +398,11 @@ func GetWalletHistory(c *gin.Context) {
 
 	query := config.DB.Model(&models.Transaction{}).Where("user_id = ?", userID)
 
-	// Apply type filter if provided
 	if transactionType != "" {
 		query = query.Where("type = ?", transactionType)
 	}
 
-	// Get total count
 	query.Count(&total)
-
-	// Get transactions with pagination
 	if err := query.Order("created_at DESC").Offset(offset).Limit(limit).Find(&transactions).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, AuthResponse{
 			Success: false,
@@ -445,7 +411,6 @@ func GetWalletHistory(c *gin.Context) {
 		return
 	}
 
-	// Format response data
 	var transactionData []gin.H
 	for _, transaction := range transactions {
 		transactionData = append(transactionData, gin.H{
@@ -484,7 +449,6 @@ func GetWalletHistory(c *gin.Context) {
 	})
 }
 
-// GetDashboardStats returns admin dashboard statistics
 func GetDashboardStats(c *gin.Context) {
 	var totalUsers int64
 	var activeUsers int64
@@ -494,19 +458,10 @@ func GetDashboardStats(c *gin.Context) {
 	var totalBets float64
 	var totalWins float64
 
-	// Get total users
 	config.DB.Model(&models.User{}).Count(&totalUsers)
-
-	// Get active users
 	config.DB.Model(&models.User{}).Where("status = ?", "active").Count(&activeUsers)
-
-	// Get banned users
 	config.DB.Model(&models.User{}).Where("status = ?", "banned").Count(&bannedUsers)
-
-	// Get total balance from all wallets
 	config.DB.Model(&models.Wallet{}).Select("COALESCE(SUM(balance), 0)").Scan(&totalBalance)
-
-	// Get game statistics
 	config.DB.Model(&models.Game{}).Count(&totalGames)
 	config.DB.Model(&models.Game{}).Select("COALESCE(SUM(bet_amount), 0)").Scan(&totalBets)
 	config.DB.Model(&models.Game{}).Select("COALESCE(SUM(win_amount), 0)").Scan(&totalWins)
@@ -530,7 +485,6 @@ func GetDashboardStats(c *gin.Context) {
 	})
 }
 
-// UpdateGameSettingsRequest structure for updating game settings
 type UpdateGameSettingsRequest struct {
 	MaxMultiplier   float64 `json:"max_multiplier" binding:"required,gt=1"`
 	MinBetAmount    float64 `json:"min_bet_amount" binding:"required,gt=0"`
@@ -539,7 +493,6 @@ type UpdateGameSettingsRequest struct {
 	IsActive        bool    `json:"is_active"`
 }
 
-// UpdateGameSettings updates casino game settings
 func UpdateGameSettings(c *gin.Context) {
 	var req UpdateGameSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -550,7 +503,6 @@ func UpdateGameSettings(c *gin.Context) {
 		return
 	}
 
-	// Validate bet amount range
 	if req.MinBetAmount >= req.MaxBetAmount {
 		c.JSON(http.StatusBadRequest, AuthResponse{
 			Success: false,
@@ -559,7 +511,6 @@ func UpdateGameSettings(c *gin.Context) {
 		return
 	}
 
-	// Validate multiplier speed (not too fast)
 	if req.MultiplierSpeed > 10.0 {
 		c.JSON(http.StatusBadRequest, AuthResponse{
 			Success: false,
@@ -568,7 +519,6 @@ func UpdateGameSettings(c *gin.Context) {
 		return
 	}
 
-	// Validate max multiplier
 	if req.MaxMultiplier < 1.1 || req.MaxMultiplier > 1000.0 {
 		c.JSON(http.StatusBadRequest, AuthResponse{
 			Success: false,
@@ -579,7 +529,6 @@ func UpdateGameSettings(c *gin.Context) {
 
 	var settings models.GameSettings
 	if err := config.DB.Where("is_active = ?", true).First(&settings).Error; err != nil {
-		// Create new settings if none exist
 		settings = models.GameSettings{
 			MaxMultiplier:   req.MaxMultiplier,
 			MinBetAmount:    req.MinBetAmount,
@@ -596,7 +545,6 @@ func UpdateGameSettings(c *gin.Context) {
 			return
 		}
 	} else {
-		// Update existing settings
 		settings.MaxMultiplier = req.MaxMultiplier
 		settings.MinBetAmount = req.MinBetAmount
 		settings.MaxBetAmount = req.MaxBetAmount
@@ -628,7 +576,6 @@ func UpdateGameSettings(c *gin.Context) {
 	})
 }
 
-// GetAdminGameSettings returns current game settings for admin
 func GetAdminGameSettings(c *gin.Context) {
 	var settings models.GameSettings
 	if err := config.DB.Where("is_active = ?", true).First(&settings).Error; err != nil {
@@ -655,7 +602,6 @@ func GetAdminGameSettings(c *gin.Context) {
 	})
 }
 
-// GetAllGames returns all games with pagination for admin
 func GetAllGames(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
@@ -668,15 +614,11 @@ func GetAllGames(c *gin.Context) {
 
 	query := config.DB.Model(&models.Game{}).Preload("User")
 
-	// Apply status filter
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
 
-	// Get total count
 	query.Count(&total)
-
-	// Get games with pagination
 	if err := query.Offset(offset).Limit(limit).Order("created_at DESC").Find(&games).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, AuthResponse{
 			Success: false,
@@ -685,7 +627,6 @@ func GetAllGames(c *gin.Context) {
 		return
 	}
 
-	// Format response data
 	var gameData []gin.H
 	for _, game := range games {
 		gameData = append(gameData, gin.H{

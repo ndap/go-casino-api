@@ -2,8 +2,8 @@ package main
 
 import (
 	"casino_api_go/config"
-	"casino_api_go/controllers"
 	"casino_api_go/config/seeders"
+	"casino_api_go/controllers"
 	"casino_api_go/routes"
 	"log"
 	"time"
@@ -12,14 +12,11 @@ import (
 )
 
 func main() {
-	// Connect to database
 	config.ConnectDB()
 	seeders.SeedAllData()
 
-	// Initialize Gin router
 	router := gin.Default()
 
-	// Setup CORS middleware
 	router.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -33,18 +30,15 @@ func main() {
 		c.Next()
 	})
 
-	// Setup routes
 	routes.SetupAuthRoutes(router)
 	routes.SetupProtectedRoutes(router)
 	routes.SetupAdminRoutes(router)
 	routes.SetupCasinoRoutes(router)
 
-	// Start cleanup goroutine for expired blacklisted tokens
 	go func() {
-		ticker := time.NewTicker(24 * time.Hour) // Run cleanup every 24 hours
+		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 
-		// Run initial cleanup
 		controllers.CleanupExpiredBlacklistedTokens()
 
 		for range ticker.C {
@@ -52,7 +46,6 @@ func main() {
 		}
 	}()
 
-	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status":  "success",
@@ -60,7 +53,6 @@ func main() {
 		})
 	})
 
-	// Start server
 	log.Println("Server starting on port 8080...")
 	if err := router.Run("0.0.0.0:8080"); err != nil {
 		log.Fatal("Failed to start server:", err)

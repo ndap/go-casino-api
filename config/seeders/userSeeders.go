@@ -8,11 +8,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// SeedUsers creates default users for testing
 func SeedUsers() {
 	log.Println("Seeding users...")
 
-	// Check if users already exist
 	var count int64
 	config.DB.Model(&models.User{}).Count(&count)
 
@@ -21,7 +19,6 @@ func SeedUsers() {
 		return
 	}
 
-	// Create admin user
 	adminPassword, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
 	admin := models.User{
 		Username: "admin",
@@ -36,10 +33,9 @@ func SeedUsers() {
 		return
 	}
 
-	// Create admin wallet
 	adminWallet := models.Wallet{
 		UserID:   admin.ID,
-		Balance:  1000000.0, // 1,000,000 IDR
+		Balance:  1000000.0,
 		Currency: "IDR",
 	}
 
@@ -48,7 +44,6 @@ func SeedUsers() {
 		return
 	}
 
-	// Create test user
 	userPassword, _ := bcrypt.GenerateFromPassword([]byte("user123"), bcrypt.DefaultCost)
 	user := models.User{
 		Username: "testuser",
@@ -63,10 +58,9 @@ func SeedUsers() {
 		return
 	}
 
-	// Create user wallet
 	userWallet := models.Wallet{
 		UserID:   user.ID,
-		Balance:  100000.0, // 100,000 IDR
+		Balance:  100000.0,
 		Currency: "IDR",
 	}
 

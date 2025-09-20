@@ -13,7 +13,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// GetProfile returns user profile information
 func GetProfile(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
@@ -45,13 +44,11 @@ func GetProfile(c *gin.Context) {
 	})
 }
 
-// UpdateProfileRequest structure for profile updates
 type UpdateProfileRequest struct {
 	Username string `json:"username" binding:"omitempty,min=3,max=50"`
 	Email    string `json:"email" binding:"omitempty,email"`
 }
 
-// UpdateProfile updates user profile information
 func UpdateProfile(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
@@ -73,7 +70,6 @@ func UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// Check if username or email already exists (if being updated)
 	if req.Username != "" && req.Username != user.Username {
 		var existingUser models.User
 		if err := config.DB.Where("username = ? AND id != ?", req.Username, userID).First(&existingUser).Error; err == nil {
@@ -121,7 +117,6 @@ func UpdateProfile(c *gin.Context) {
 	})
 }
 
-// GetWallet returns user wallet information
 func GetWallet(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
@@ -147,13 +142,11 @@ func GetWallet(c *gin.Context) {
 	})
 }
 
-// ChangePasswordRequest structure for password change
 type ChangePasswordRequest struct {
 	CurrentPassword string `json:"current_password" binding:"required"`
 	NewPassword     string `json:"new_password" binding:"required,min=6"`
 }
 
-// ChangePassword allows users to change their password
 func ChangePassword(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
@@ -175,7 +168,6 @@ func ChangePassword(c *gin.Context) {
 		return
 	}
 
-	// Verify current password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.CurrentPassword)); err != nil {
 		c.JSON(http.StatusUnauthorized, AuthResponse{
 			Success: false,
@@ -184,7 +176,6 @@ func ChangePassword(c *gin.Context) {
 		return
 	}
 
-	// Hash new password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, AuthResponse{
@@ -209,19 +200,16 @@ func ChangePassword(c *gin.Context) {
 	})
 }
 
-// DepositRequest structure for deposit request
 type DepositRequest struct {
 	Amount      float64 `json:"amount" binding:"required,gt=0"`
 	Description string  `json:"description,omitempty"`
 }
 
-// WithdrawRequest structure for withdraw request
 type WithdrawRequest struct {
 	Amount      float64 `json:"amount" binding:"required,gt=0"`
 	Description string  `json:"description,omitempty"`
 }
 
-// Deposit allows users to deposit money to their wallet
 func Deposit(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
@@ -234,7 +222,6 @@ func Deposit(c *gin.Context) {
 		return
 	}
 
-	// Validate minimum deposit amount
 	if req.Amount < 10000 {
 		c.JSON(http.StatusBadRequest, AuthResponse{
 			Success: false,
@@ -243,7 +230,6 @@ func Deposit(c *gin.Context) {
 		return
 	}
 
-	// Validate maximum deposit amount
 	if req.Amount > 10000000 {
 		c.JSON(http.StatusBadRequest, AuthResponse{
 			Success: false,
@@ -261,7 +247,6 @@ func Deposit(c *gin.Context) {
 		return
 	}
 
-	// Check if user is banned
 	if user.Status == "banned" {
 		c.JSON(http.StatusForbidden, AuthResponse{
 			Success: false,
@@ -270,10 +255,7 @@ func Deposit(c *gin.Context) {
 		return
 	}
 
-	// Use transaction for wallet update and transaction record
 	tx := config.DB.Begin()
-
-	// Update wallet balance
 	oldBalance := user.Wallet.Balance
 	user.Wallet.Balance += req.Amount
 
@@ -286,7 +268,6 @@ func Deposit(c *gin.Context) {
 		return
 	}
 
-	// Create transaction record
 	transaction := models.Transaction{
 		UserID:      userID,
 		Type:        "deposit",
@@ -331,7 +312,6 @@ func Deposit(c *gin.Context) {
 	})
 }
 
-// Withdraw allows users to withdraw money from their wallet
 func Withdraw(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
@@ -344,7 +324,6 @@ func Withdraw(c *gin.Context) {
 		return
 	}
 
-	// Validate minimum withdraw amount
 	if req.Amount < 50000 {
 		c.JSON(http.StatusBadRequest, AuthResponse{
 			Success: false,
@@ -353,7 +332,6 @@ func Withdraw(c *gin.Context) {
 		return
 	}
 
-	// Validate maximum withdraw amount
 	if req.Amount > 5000000 {
 		c.JSON(http.StatusBadRequest, AuthResponse{
 			Success: false,
@@ -371,7 +349,6 @@ func Withdraw(c *gin.Context) {
 		return
 	}
 
-	// Check if user is banned
 	if user.Status == "banned" {
 		c.JSON(http.StatusForbidden, AuthResponse{
 			Success: false,
@@ -380,7 +357,6 @@ func Withdraw(c *gin.Context) {
 		return
 	}
 
-	// Check if user has sufficient balance
 	if user.Wallet.Balance < req.Amount {
 		c.JSON(http.StatusBadRequest, AuthResponse{
 			Success: false,
@@ -389,10 +365,7 @@ func Withdraw(c *gin.Context) {
 		return
 	}
 
-	// Use transaction for wallet update and transaction record
 	tx := config.DB.Begin()
-
-	// Update wallet balance
 	oldBalance := user.Wallet.Balance
 	user.Wallet.Balance -= req.Amount
 
@@ -405,7 +378,6 @@ func Withdraw(c *gin.Context) {
 		return
 	}
 
-	// Create transaction record
 	transaction := models.Transaction{
 		UserID:      userID,
 		Type:        "withdraw",
@@ -450,14 +422,12 @@ func Withdraw(c *gin.Context) {
 	})
 }
 
-// GetTransactionHistory returns user's transaction history
 func GetTransactionHistory(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
-	// Get pagination parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	transactionType := c.Query("type") // Filter by transaction type
+	transactionType := c.Query("type")
 
 	offset := (page - 1) * limit
 
@@ -466,15 +436,11 @@ func GetTransactionHistory(c *gin.Context) {
 
 	query := config.DB.Model(&models.Transaction{}).Where("user_id = ?", userID)
 
-	// Apply type filter if provided
 	if transactionType != "" {
 		query = query.Where("type = ?", transactionType)
 	}
 
-	// Get total count
 	query.Count(&total)
-
-	// Get transactions with pagination
 	if err := query.Order("created_at DESC").Offset(offset).Limit(limit).Find(&transactions).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, AuthResponse{
 			Success: false,
@@ -483,7 +449,6 @@ func GetTransactionHistory(c *gin.Context) {
 		return
 	}
 
-	// Format response data
 	var transactionData []gin.H
 	for _, transaction := range transactions {
 		transactionData = append(transactionData, gin.H{
@@ -513,7 +478,6 @@ func GetTransactionHistory(c *gin.Context) {
 	})
 }
 
-// generateReferenceNumber generates a unique reference number for transactions
 func generateReferenceNumber() string {
 	return fmt.Sprintf("REF-%d-%d", time.Now().Unix(), rand.Intn(9999))
 }

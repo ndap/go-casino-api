@@ -68,13 +68,12 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	// Check if this is the first user (make them admin)
 	var userCount int64
 	config.DB.Model(&models.User{}).Count(&userCount)
 
 	role := "user"
 	if userCount == 0 {
-		role = "admin" // First user becomes admin
+		role = "admin"
 	}
 
 	user := models.User{
@@ -222,7 +221,6 @@ func Login(c *gin.Context) {
 }
 
 func Logout(c *gin.Context) {
-	// Get user info from context (set by AuthMiddleware)
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, AuthResponse{
@@ -232,13 +230,11 @@ func Logout(c *gin.Context) {
 		return
 	}
 
-	// Get token from header
 	tokenString := c.GetHeader("Authorization")
 	if len(tokenString) > 7 && tokenString[:7] == "Bearer " {
 		tokenString = tokenString[7:]
 	}
 
-	// Parse token to get expiration time
 	claims, err := ValidateToken(tokenString)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, AuthResponse{
@@ -248,7 +244,6 @@ func Logout(c *gin.Context) {
 		return
 	}
 
-	// Add token to blacklist
 	blacklistedToken := models.BlacklistedToken{
 		Token:     tokenString,
 		UserID:    userID.(uint),
@@ -320,7 +315,6 @@ func AuthMiddleware() gin.HandlerFunc {
 			tokenString = tokenString[7:]
 		}
 
-		// Check if token is blacklisted
 		var blacklistedToken models.BlacklistedToken
 		if err := config.DB.Where("token = ?", tokenString).First(&blacklistedToken).Error; err == nil {
 			c.JSON(http.StatusUnauthorized, AuthResponse{
@@ -349,12 +343,8 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// CleanupExpiredBlacklistedTokens removes expired tokens from blacklist
 func CleanupExpiredBlacklistedTokens() {
-	// This function should be called periodically (e.g., daily)
-	// You can set up a cron job or call this function in your main.go
 	if err := config.DB.Where("expires_at < ?", time.Now()).Delete(&models.BlacklistedToken{}).Error; err != nil {
-		// Log the error but don't panic
 		println("Failed to cleanup expired blacklisted tokens:", err.Error())
 	}
 }
